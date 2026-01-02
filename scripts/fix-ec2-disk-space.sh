@@ -2,7 +2,7 @@
 
 # Fix EC2 disk space issues
 
-EC2_HOST="ubuntu@3.239.116.3"
+EC2_HOST="ubuntu@44.210.237.157"
 KEY_PATH="~/Downloads/text-to-code-key.pem"
 
 echo "🔍 Checking disk usage on EC2..."

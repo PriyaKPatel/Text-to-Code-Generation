@@ -4,7 +4,7 @@
 
 set -e
 
-EC2_HOST="ubuntu@3.239.116.3"
+EC2_HOST="ubuntu@44.210.237.157"
 KEY_PATH="~/Downloads/text-to-code-key.pem"
 ECR_REPO="518627289438.dkr.ecr.us-east-1.amazonaws.com/text-to-code"
 
@@ -52,5 +52,5 @@ docker logs -f text-to-code
 ENDSSH
 
 echo "✅ Deployment complete!"
-echo "🌐 Test at: http://3.239.116.3/health"
+echo "🌐 Test at: http://44.210.237.157/health"
 

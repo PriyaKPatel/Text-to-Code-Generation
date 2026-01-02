@@ -4,7 +4,7 @@
 
 set -e
 
-EC2_HOST="ubuntu@3.239.116.3"
+EC2_HOST="ubuntu@44.210.237.157"
 KEY_PATH="~/Downloads/text-to-code-key.pem"
 ECR_REPO="518627289438.dkr.ecr.us-east-1.amazonaws.com/text-to-code"
 
@@ -42,7 +42,7 @@ docker logs text-to-code
 
 echo ""
 echo "✅ Deployment complete!"
-echo "🌐 API URL: http://3.239.116.3"
+echo "🌐 API URL: http://44.210.237.157"
 echo ""
 echo "🧪 Testing health endpoint..."
 curl -s http://localhost/health | head -20
@@ -51,5 +51,5 @@ ENDSSH
 
 echo ""
 echo "🎉 All done! Your updated API is running on EC2"
-echo "Test it: curl http://3.239.116.3/health"
+echo "Test it: curl http://44.210.237.157/health"
 
