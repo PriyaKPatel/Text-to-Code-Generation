@@ -1,7 +1,7 @@
 """
 Pydantic schemas for request/response validation
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -27,21 +27,23 @@ class CodeRequest(BaseModel):
         description="Sampling temperature (higher = more creative)"
     )
     
-    @validator('prompt')
+    @field_validator('prompt')
+    @classmethod
     def validate_prompt(cls, v):
         """Validate prompt is not empty after stripping"""
         if not v.strip():
             raise ValueError("Prompt cannot be empty")
         return v.strip()
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "prompt": "create a function to reverse a string",
                 "max_length": 150,
                 "temperature": 0.7
             }
         }
+    )
 
 class CodeResponse(BaseModel):
     """Response schema for code generation"""
@@ -62,8 +64,8 @@ class CodeResponse(BaseModel):
         description="Original prompt (echo)"
     )
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "code": "def reverse_string(s):\n    return s[::-1]",
                 "latency": 0.345,
@@ -71,6 +73,7 @@ class CodeResponse(BaseModel):
                 "prompt": "create a function to reverse a string"
             }
         }
+    )
 
 class HealthResponse(BaseModel):
     """Health check response schema"""
@@ -95,8 +98,9 @@ class HealthResponse(BaseModel):
         description="Error message if unhealthy"
     )
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        protected_namespaces=(),  # Fix model_loaded field warning
+        json_schema_extra={
             "example": {
                 "status": "healthy",
                 "model_loaded": True,
@@ -104,6 +108,7 @@ class HealthResponse(BaseModel):
                 "version": "1.0.0"
             }
         }
+    )
 
 class ErrorResponse(BaseModel):
     """Error response schema"""
@@ -120,11 +125,12 @@ class ErrorResponse(BaseModel):
         description="Error timestamp"
     )
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "detail": "Model not loaded",
                 "status_code": 503,
                 "timestamp": "2025-01-15T10:30:00.000Z"
             }
         }
+    )

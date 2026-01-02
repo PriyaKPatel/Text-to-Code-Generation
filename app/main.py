@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from contextlib import asynccontextmanager
 import time
 import logging
 import json
@@ -43,11 +44,38 @@ MODEL_LOAD_STATUS = Gauge(
     'Model load status (1=loaded, 0=not loaded)'
 )
 
+# Global model instance
+code_generator: Optional[T5CodeGenerator] = None
+
+# Lifespan context manager for startup/shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan events"""
+    # Startup
+    logger.info("Starting up Text-to-Code API...")
+    try:
+        global code_generator
+        if code_generator is None:
+            logger.info("Initializing T5 Code Generator...")
+            code_generator = T5CodeGenerator()
+            MODEL_LOAD_STATUS.set(1 if code_generator.is_loaded() else 0)
+            logger.info("Model initialized successfully")
+        logger.info("Startup complete")
+    except Exception as e:
+        logger.error(f"Failed to initialize model: {str(e)}")
+        MODEL_LOAD_STATUS.set(0)
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Text-to-Code API...")
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Text-to-Code Generation API",
     description="Generate Python code from natural language descriptions using fine-tuned T5 model",
     version="1.0.0",
+    lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -59,31 +87,15 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
-# Initialize model (lazy loading)
-code_generator: Optional[T5CodeGenerator] = None
-
 def get_model():
-    """Get or initialize the model"""
+    """Get the code generator model (initialized during startup)"""
     global code_generator
     if code_generator is None:
-        logger.info("Initializing T5 Code Generator...")
-        code_generator = T5CodeGenerator()
-        MODEL_LOAD_STATUS.set(1 if code_generator.is_loaded() else 0)
-        logger.info("Model initialized successfully")
+        raise RuntimeError("Model not initialized. Please check startup logs.")
     return code_generator
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize model on startup"""
-    logger.info("Starting up Text-to-Code API...")
-    try:
-        get_model()
-        logger.info("Startup complete")
-    except Exception as e:
-        logger.error(f"Failed to initialize model: {str(e)}")
-        MODEL_LOAD_STATUS.set(0)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -245,10 +257,14 @@ async def stats():
     """
     Get API statistics
     """
+    try:
+        model = get_model()
+        model_loaded = model.is_loaded()
+    except:
+        model_loaded = False
+    
     return {
-        "model_loaded": code_generator.is_loaded() if code_generator else False,
-        "active_requests": ACTIVE_REQUESTS._value._value,
-        "total_requests": REQUEST_COUNT._metrics,
+        "model_loaded": model_loaded,
         "timestamp": datetime.utcnow().isoformat()
     }
 
