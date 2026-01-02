@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: text-to-code-service
+  labels:
+    app: text-to-code
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: text-to-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: text-to-code-metrics
+  labels:
+    app: text-to-code
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: metrics
+  selector:
+    app: text-to-code
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: text-to-code-config
+data:
+  MODEL_PATH: "/app/models"
+  S3_PREFIX: "models/v1"
+  AWS_DEFAULT_REGION: "us-east-1"
+  LOG_LEVEL: "INFO"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: text-to-code-secrets
+type: Opaque
+stringData:
+  s3-bucket: "YOUR_S3_BUCKET_NAME"
+  # Add other secrets as needed
+  # aws-access-key-id: "YOUR_ACCESS_KEY"
+  # aws-secret-access-key: "YOUR_SECRET_KEY"

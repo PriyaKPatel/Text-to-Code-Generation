@@ -1,0 +1,41 @@
+{
+    "UserId": "AIDAXRQEYNFPEFKURVZNQ",
+    "Account": "518627289438",
+    "Arn": "arn:aws:iam::518627289438:user/text-to-code-deploy"
+}
+
+518627289438.dkr.ecr.us-east-1.amazonaws.com/text-to-code
+
+Public IP: 44.201.13.243
+
+
+
+docker tag text-to-code:latest 518627289438.dkr.ecr.us-east-1.amazonaws.com/text-to-code:latest 
+
+docker push 518627289438.dkr.ecr.us-east-1.amazonaws.com/text-to-code:latest
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 518627289438.dkr.ecr.us-east-1.amazonaws.com
+
+ssh -i ~/Downloads/text-to-code-key.pem ubuntu@3.239.116.3
+
+# Stop old container
+docker stop text-to-code 2>/dev/null
+docker rm text-to-code 2>/dev/null
+
+# Login to ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 518627289438.dkr.ecr.us-east-1.amazonaws.com
+
+# Pull new image (with fixes)
+docker pull 518627289438.dkr.ecr.us-east-1.amazonaws.com/text-to-code:latest
+
+# Run new container
+docker run -d \
+  --name text-to-code \
+  -p 80:8000 \
+  --restart unless-stopped \
+  -e AWS_DEFAULT_REGION=us-east-1 \
+  -e S3_BUCKET=text-to-code-models-priya \
+  -e S3_PREFIX=models/v1 \
+  518627289438.dkr.ecr.us-east-1.amazonaws.com/text-to-code:latest
+
+# Watch logs
+docker logs -f text-to-code

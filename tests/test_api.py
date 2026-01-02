@@ -1,0 +1,190 @@
+"""
+Unit tests for the Text-to-Code API
+"""
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+import json
+
+client = TestClient(app)
+
+class TestHealthEndpoint:
+    """Test health check endpoint"""
+    
+    def test_health_check_returns_200(self):
+        """Test that health endpoint returns 200"""
+        response = client.get("/health")
+        assert response.status_code == 200
+    
+    def test_health_check_response_structure(self):
+        """Test health check response has correct structure"""
+        response = client.get("/health")
+        data = response.json()
+        
+        assert "status" in data
+        assert "model_loaded" in data
+        assert "timestamp" in data
+        assert "version" in data
+    
+    def test_health_status_is_valid(self):
+        """Test health status is either healthy or unhealthy"""
+        response = client.get("/health")
+        data = response.json()
+        
+        assert data["status"] in ["healthy", "unhealthy"]
+
+class TestRootEndpoint:
+    """Test root endpoint"""
+    
+    def test_root_returns_200(self):
+        """Test root endpoint returns 200"""
+        response = client.get("/")
+        assert response.status_code == 200
+    
+    def test_root_response_structure(self):
+        """Test root endpoint returns API info"""
+        response = client.get("/")
+        data = response.json()
+        
+        assert "message" in data
+        assert "version" in data
+        assert "docs" in data
+
+class TestGenerateEndpoint:
+    """Test code generation endpoint"""
+    
+    def test_generate_requires_prompt(self):
+        """Test that generate endpoint requires prompt"""
+        response = client.post("/generate", json={})
+        assert response.status_code == 422  # Validation error
+    
+    def test_generate_with_valid_prompt(self):
+        """Test code generation with valid prompt"""
+        response = client.post(
+            "/generate",
+            json={"prompt": "create a function to add two numbers"}
+        )
+        # May be 200 or 503 depending on model availability
+        assert response.status_code in [200, 503]
+    
+    def test_generate_response_structure(self):
+        """Test generate response has correct structure if successful"""
+        response = client.post(
+            "/generate",
+            json={
+                "prompt": "create a simple hello world function",
+                "max_length": 100,
+                "temperature": 0.7
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            assert "code" in data
+            assert "latency" in data
+            assert "timestamp" in data
+            assert isinstance(data["code"], str)
+            assert isinstance(data["latency"], (int, float))
+    
+    def test_generate_validates_prompt_length(self):
+        """Test that very short prompts are rejected"""
+        response = client.post(
+            "/generate",
+            json={"prompt": "hi"}
+        )
+        assert response.status_code == 422
+    
+    def test_generate_validates_max_length(self):
+        """Test that max_length is validated"""
+        response = client.post(
+            "/generate",
+            json={
+                "prompt": "create a function",
+                "max_length": 1000  # Too high
+            }
+        )
+        assert response.status_code == 422
+    
+    def test_generate_validates_temperature(self):
+        """Test that temperature is validated"""
+        response = client.post(
+            "/generate",
+            json={
+                "prompt": "create a function",
+                "temperature": 5.0  # Too high
+            }
+        )
+        assert response.status_code == 422
+
+class TestMetricsEndpoint:
+    """Test metrics endpoint"""
+    
+    def test_metrics_endpoint_exists(self):
+        """Test that metrics endpoint exists"""
+        response = client.get("/metrics")
+        assert response.status_code == 200
+    
+    def test_metrics_content_type(self):
+        """Test metrics returns plain text"""
+        response = client.get("/metrics")
+        assert "text/plain" in response.headers["content-type"]
+
+class TestStatsEndpoint:
+    """Test stats endpoint"""
+    
+    def test_stats_endpoint_exists(self):
+        """Test that stats endpoint exists"""
+        response = client.get("/stats")
+        assert response.status_code == 200
+    
+    def test_stats_response_structure(self):
+        """Test stats response structure"""
+        response = client.get("/stats")
+        data = response.json()
+        
+        assert "model_loaded" in data
+        assert "timestamp" in data
+        assert isinstance(data["model_loaded"], bool)
+
+# Integration tests
+class TestIntegration:
+    """Integration tests"""
+    
+    def test_full_workflow(self):
+        """Test complete workflow from health check to generation"""
+        # Check health
+        health = client.get("/health")
+        assert health.status_code == 200
+        
+        # Check root
+        root = client.get("/")
+        assert root.status_code == 200
+        
+        # Try generation
+        response = client.post(
+            "/generate",
+            json={"prompt": "create a function to calculate factorial"}
+        )
+        # Should succeed or fail gracefully
+        assert response.status_code in [200, 503]
+    
+    def test_cors_headers(self):
+        """Test that CORS headers are set"""
+        response = client.options("/")
+        # CORS headers should be present
+        assert "access-control-allow-origin" in response.headers
+
+# Model-specific tests
+class TestModelValidation:
+    """Test model-specific functionality"""
+    
+    def test_empty_prompt_rejected(self):
+        """Test that empty prompts are rejected"""
+        response = client.post(
+            "/generate",
+            json={"prompt": "   "}  # Only whitespace
+        )
+        assert response.status_code == 422
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
