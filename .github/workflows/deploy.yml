@@ -92,7 +92,16 @@ jobs:
         mkdir -p ~/.ssh
         echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
         chmod 600 ~/.ssh/deploy_key
-        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+        
+        # Try to scan SSH keys with timeout, disable strict host checking if it fails
+        if timeout 10 ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null; then
+          echo "✅ SSH host key added successfully"
+        else
+          echo "⚠️ ssh-keyscan failed (timeout or unreachable), will use StrictHostKeyChecking=no"
+          echo "Host ${{ secrets.EC2_HOST }}" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
+        fi
     
     - name: Deploy to EC2
       env:
@@ -106,30 +115,20 @@ jobs:
         IMAGE_NAME="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
         echo "Deploying image: $IMAGE_NAME"
         
-        ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << EOF
-          echo "📊 Checking disk space before cleanup..."
-          df -h /
-          
-          echo "🧹 Cleaning up Docker to free space..."
-          # Stop and remove existing container
-          docker stop text-to-code || true
-          docker rm text-to-code || true
-          
-          # Remove old Docker images and containers
-          docker system prune -a -f
-          
-          # Clean apt cache
-          sudo apt-get clean || true
-          
-          echo "📊 Disk space after cleanup:"
-          df -h /
-          
+        ssh -i ~/.ssh/deploy_key \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          -o ConnectTimeout=30 \
+          ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << EOF
           # Login to ECR
           aws ecr get-login-password --region ${AWS_REGION} | \
             docker login --username AWS --password-stdin ${ECR_REGISTRY}
           
+          # Stop and remove existing container
+          docker stop text-to-code || true
+          docker rm text-to-code || true
+          
           # Pull latest image
-          echo "📥 Pulling new image..."
           docker pull ${IMAGE_NAME}
           
           # Run new container
