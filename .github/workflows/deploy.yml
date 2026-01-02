@@ -128,13 +128,43 @@ jobs:
             -e S3_PREFIX=${S3_PREFIX} \
             ${IMAGE_NAME}
           
-          # Wait for health check
-          sleep 10
-          curl -f http://localhost:8000/health || exit 1
+          # Wait for model to download and load (can take 30-60 seconds)
+          echo "⏳ Waiting for model to load from S3..."
+          sleep 60
+          
+          # Check if container is still running
+          if ! docker ps | grep -q text-to-code; then
+            echo "❌ Container failed to start. Logs:"
+            docker logs text-to-code
+            exit 1
+          fi
+          
+          # Health check with retries
+          for i in {1..5}; do
+            if curl -f http://localhost:8000/health; then
+              echo "✅ Health check passed!"
+              exit 0
+            fi
+            echo "Retry \$i/5 failed, waiting 10s..."
+            sleep 10
+          done
+          
+          echo "❌ Health check failed after 5 retries. Container logs:"
+          docker logs text-to-code
+          exit 1
         EOF
     
     - name: Verify deployment
       run: |
-        sleep 5
-        curl -f http://${{ secrets.EC2_HOST }}/health || exit 1
+        echo "🔍 Verifying deployment from outside EC2..."
+        for i in {1..3}; do
+          if curl -f http://${{ secrets.EC2_HOST }}/health; then
+            echo "✅ External health check passed!"
+            exit 0
+          fi
+          echo "Retry $i/3 failed, waiting 10s..."
+          sleep 10
+        done
+        echo "❌ External health check failed"
+        exit 1
 
