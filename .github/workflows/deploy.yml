@@ -92,16 +92,7 @@ jobs:
         mkdir -p ~/.ssh
         echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
         chmod 600 ~/.ssh/deploy_key
-        
-        # Try to scan SSH keys with timeout, disable strict host checking if it fails
-        if timeout 10 ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null; then
-          echo "✅ SSH host key added successfully"
-        else
-          echo "⚠️ ssh-keyscan failed (timeout or unreachable), will use StrictHostKeyChecking=no"
-          echo "Host ${{ secrets.EC2_HOST }}" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
-          echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
-        fi
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
     
     - name: Deploy to EC2
       env:
@@ -115,11 +106,7 @@ jobs:
         IMAGE_NAME="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
         echo "Deploying image: $IMAGE_NAME"
         
-        ssh -i ~/.ssh/deploy_key \
-          -o StrictHostKeyChecking=no \
-          -o UserKnownHostsFile=/dev/null \
-          -o ConnectTimeout=30 \
-          ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << EOF
+        ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << EOF
           # Login to ECR
           aws ecr get-login-password --region ${AWS_REGION} | \
             docker login --username AWS --password-stdin ${ECR_REGISTRY}
@@ -141,29 +128,35 @@ jobs:
             -e S3_PREFIX=${S3_PREFIX} \
             ${IMAGE_NAME}
           
-          # Wait for model to download and load (can take 30-60 seconds)
-          echo "⏳ Waiting for model to load from S3..."
-          sleep 60
+          # Wait for model to download and load (TensorFlow model takes 80-90 seconds)
+          echo "⏳ Waiting for TensorFlow model to load from S3..."
+          echo "   This takes about 90 seconds (S3 download + TF initialization)"
+          sleep 90
           
           # Check if container is still running
           if ! docker ps | grep -q text-to-code; then
             echo "❌ Container failed to start. Logs:"
-            docker logs text-to-code
+            docker logs text-to-code | tail -100
             exit 1
           fi
           
-          # Health check with retries
-          for i in {1..5}; do
-            if curl -f http://localhost:8000/health; then
-              echo "✅ Health check passed!"
+          # Health check with retries (up to 10 attempts = 100 more seconds)
+          echo "🏥 Checking health endpoint..."
+          for i in {1..10}; do
+            if curl -f http://localhost:8000/health 2>/dev/null; then
+              echo ""
+              echo "✅ Health check passed on attempt \$i!"
+              docker logs text-to-code | tail -20
               exit 0
             fi
-            echo "Retry \$i/5 failed, waiting 10s..."
+            echo "   Retry \$i/10 failed, waiting 10s..."
             sleep 10
           done
           
-          echo "❌ Health check failed after 5 retries. Container logs:"
-          docker logs text-to-code
+          echo ""
+          echo "❌ Health check failed after 10 retries (190 seconds total)."
+          echo "Container logs:"
+          docker logs text-to-code | tail -100
           exit 1
         EOF
     
