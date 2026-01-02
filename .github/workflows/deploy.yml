@@ -143,13 +143,17 @@ jobs:
           # Health check with retries (up to 10 attempts = 100 more seconds)
           echo "🏥 Checking health endpoint..."
           for i in {1..10}; do
-            if curl -f http://localhost:8000/health 2>/dev/null; then
+            HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "000")
+            if [ "\$HTTP_CODE" = "200" ]; then
               echo ""
-              echo "✅ Health check passed on attempt \$i!"
+              echo "✅ Health check passed on attempt \$i! (HTTP \$HTTP_CODE)"
+              curl -s http://localhost:8000/health | head -5
+              echo ""
+              echo "📋 Recent container logs:"
               docker logs text-to-code | tail -20
               exit 0
             fi
-            echo "   Retry \$i/10 failed, waiting 10s..."
+            echo "   Retry \$i/10 failed (HTTP \$HTTP_CODE), waiting 10s..."
             sleep 10
           done
           
