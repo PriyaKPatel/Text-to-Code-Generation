@@ -124,16 +124,13 @@ async def log_requests(request: Request, call_next):
         logger.error(f"Request failed: {str(e)}")
         raise
 
-@app.get("/", tags=["Root"])
+@app.get("/", response_class=FileResponse, tags=["Frontend"])
 async def root():
-    """Root endpoint"""
-    return {
-        "message": "Text-to-Code Generation API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "health": "/health",
-        "metrics": "/metrics"
-    }
+    """Serve the React frontend UI"""
+    html_path = Path(__file__).parent / "index.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Frontend UI not found")
+    return FileResponse(html_path)
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():
@@ -276,16 +273,6 @@ async def stats():
         "model_loaded": model_loaded,
         "timestamp": datetime.utcnow().isoformat()
     }
-
-@app.get("/", response_class=FileResponse, tags=["Frontend"])
-async def serve_ui():
-    """
-    Serve the React frontend UI
-    """
-    html_path = Path(__file__).parent / "index.html"
-    if not html_path.exists():
-        raise HTTPException(status_code=404, detail="Frontend UI not found")
-    return FileResponse(html_path)
 
 if __name__ == "__main__":
     import uvicorn
