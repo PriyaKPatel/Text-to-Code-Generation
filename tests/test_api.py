@@ -41,13 +41,25 @@ class TestRootEndpoint:
         assert response.status_code == 200
     
     def test_root_response_structure(self, client):
-        """Test root endpoint returns API info"""
+        """Test root endpoint returns HTML UI"""
         response = client.get("/")
-        data = response.json()
         
+        # Root now serves the React UI (HTML)
+        assert response.status_code == 200
+        assert "text/html" in response.headers.get("content-type", "")
+        assert b"<!DOCTYPE html>" in response.content
+        assert b"Text to Code Generator" in response.content
+    
+    def test_api_info_endpoint(self, client):
+        """Test /api/info endpoint returns API information"""
+        response = client.get("/api/info")
+        assert response.status_code == 200
+        
+        data = response.json()
         assert "message" in data
         assert "version" in data
         assert "docs" in data
+        assert data["version"] == "1.0.0"
 
 class TestGenerateEndpoint:
     """Test code generation endpoint"""

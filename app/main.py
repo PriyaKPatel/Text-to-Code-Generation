@@ -132,6 +132,18 @@ async def root():
         raise HTTPException(status_code=404, detail="Frontend UI not found")
     return FileResponse(html_path)
 
+@app.get("/api/info", tags=["Root"])
+async def api_info():
+    """Get API information and available endpoints"""
+    return {
+        "message": "Text-to-Code Generation API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health",
+        "metrics": "/metrics",
+        "frontend": "/"
+    }
+
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():
     """
