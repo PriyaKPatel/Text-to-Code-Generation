@@ -92,7 +92,6 @@ app.add_middleware(
 
 def get_model():
     """Get the code generator model (initialized during startup)"""
-    global code_generator
     if code_generator is None:
         raise RuntimeError("Model not initialized. Please check startup logs.")
     return code_generator
