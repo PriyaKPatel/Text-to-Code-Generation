@@ -180,7 +180,15 @@ async def generate_code(request: CodeRequest):
     
     try:
         # Get model
-        model = get_model()
+        try:
+            model = get_model()
+        except RuntimeError as e:
+            # Model not initialized yet (happens during tests or startup failures)
+            REQUEST_COUNT.labels(status='error').inc()
+            raise HTTPException(
+                status_code=503,
+                detail="Model not initialized. Please try again later."
+            )
         
         if not model.is_loaded():
             REQUEST_COUNT.labels(status='error').inc()

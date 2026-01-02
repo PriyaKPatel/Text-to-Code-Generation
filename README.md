@@ -336,18 +336,7 @@ text-to-code-generation/
 - **Model Size**: 220M parameters (T5-base)
 - **Accuracy**: 86% on test set
 
-## 🔮 Future Improvements
-
-- [ ] Add model A/B testing capability
-- [ ] Implement caching for common prompts
-- [ ] Add support for multiple programming languages
-- [ ] Implement rate limiting
-- [ ] Add user authentication
-- [ ] Create Kubernetes Helm charts
-- [ ] Add more comprehensive monitoring dashboards
-- [ ] Implement continuous training pipeline
-
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -357,26 +346,14 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 👤 Author
+## Author
 
 **Priya Patel**
 - GitHub: [@PriyaKPatel](https://github.com/PriyaKPatel)
 - LinkedIn: [Your LinkedIn](https://linkedin.com/in/YOUR_PROFILE)
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Google Research for the T5 model
 - Hugging Face for the Transformers library
-- FastAPI team for the amazing framework
-
-## 📞 Contact
-
-For questions or feedback, please open an issue or contact me directly.
-
----
-
-⭐ If you find this project helpful, please give it a star!

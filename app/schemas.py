@@ -11,8 +11,7 @@ class CodeRequest(BaseModel):
         ..., 
         min_length=5,
         max_length=500,
-        description="Natural language description of the code to generate",
-        example="create a function to sort a list in ascending order"
+        description="Natural language description of the code to generate"
     )
     max_length: int = Field(
         default=150,
