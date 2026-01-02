@@ -4,7 +4,8 @@ Includes monitoring, logging, and health checks
 """
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import Response, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 from contextlib import asynccontextmanager
 import time
@@ -13,6 +14,7 @@ import json
 from datetime import datetime
 from typing import Optional
 import os
+from pathlib import Path
 
 from .model import T5CodeGenerator
 from .schemas import CodeRequest, CodeResponse, HealthResponse
@@ -274,6 +276,16 @@ async def stats():
         "model_loaded": model_loaded,
         "timestamp": datetime.utcnow().isoformat()
     }
+
+@app.get("/", response_class=FileResponse, tags=["Frontend"])
+async def serve_ui():
+    """
+    Serve the React frontend UI
+    """
+    html_path = Path(__file__).parent / "index.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Frontend UI not found")
+    return FileResponse(html_path)
 
 if __name__ == "__main__":
     import uvicorn

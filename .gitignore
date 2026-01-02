@@ -12,10 +12,11 @@ ENV/
 *.h5
 !docs/.gitkeep
 # Environment variables
+acc_id.txt
+1.txt
 .env
 .env.local
 aws-config.txt
-acc_id.txt
 SECRETS_VALUES.txt
 .github/SECRETS_VALUES.txt
 # IDE

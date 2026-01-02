@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Code Generator</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Smooth typing cursor animation */
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        .typing-cursor {
+            animation: blink 1s infinite;
+        }
+
+        /* Code block styling */
+        pre {
+            font-family: 'Fira Code', 'Courier New', monospace;
+        }
+
+        /* Gradient background animation */
+        @keyframes gradient-shift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .gradient-animate {
+            background-size: 200% 200%;
+            animation: gradient-shift 15s ease infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // Lucide Icons as SVG components
+        const Send = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+        );
+
+        const Code = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+        );
+
+        const Sparkles = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v18m9-9H3m15.5-6.5L6.5 17.5m11 0L6.5 6.5"></path>
+            </svg>
+        );
+
+        const Copy = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+        );
+
+        const Check = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        );
+
+        function TextToCodeUI() {
+            const [messages, setMessages] = useState([
+                {
+                    type: 'assistant',
+                    content: '👋 Hi! I can help you generate Python code from natural language. Just describe what you want to build!',
+                    timestamp: new Date()
+                }
+            ]);
+            const [input, setInput] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [copiedIndex, setCopiedIndex] = useState(null);
+            const messagesEndRef = useRef(null);
+
+            // API URL - automatically uses the same host as the UI
+            const API_URL = `${window.location.protocol}//${window.location.host}/generate`;
+
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            };
+
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages]);
+
+            const typeWriter = (text, callback) => {
+                let index = 0;
+                const speed = 15;
+                
+                const type = () => {
+                    if (index < text.length) {
+                        callback(text.substring(0, index + 1));
+                        index++;
+                        setTimeout(type, speed);
+                    }
+                };
+                
+                type();
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!input.trim() || isGenerating) return;
+
+                const userMessage = {
+                    type: 'user',
+                    content: input,
+                    timestamp: new Date()
+                };
+
+                setMessages(prev => [...prev, userMessage]);
+                const currentInput = input;
+                setInput('');
+                setIsGenerating(true);
+
+                const assistantIndex = messages.length + 1;
+                setMessages(prev => [...prev, {
+                    type: 'assistant',
+                    content: '',
+                    code: '',
+                    isTyping: true,
+                    timestamp: new Date()
+                }]);
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            prompt: currentInput,
+                            max_length: 200,
+                            temperature: 0.7
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to generate code');
+
+                    const data = await response.json();
+                    const generatedCode = data.code;
+
+                    let currentCode = '';
+                    typeWriter(generatedCode, (text) => {
+                        currentCode = text;
+                        setMessages(prev => {
+                            const newMessages = [...prev];
+                            newMessages[assistantIndex] = {
+                                ...newMessages[assistantIndex],
+                                code: currentCode,
+                                isTyping: currentCode.length < generatedCode.length
+                            };
+                            return newMessages;
+                        });
+                    });
+
+                } catch (error) {
+                    setMessages(prev => {
+                        const newMessages = [...prev];
+                        newMessages[assistantIndex] = {
+                            type: 'assistant',
+                            content: '❌ Sorry, I encountered an error. Please make sure the API is running at ' + API_URL,
+                            error: true,
+                            timestamp: new Date()
+                        };
+                        return newMessages;
+                    });
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const copyToClipboard = (code, index) => {
+                navigator.clipboard.writeText(code);
+                setCopiedIndex(index);
+                setTimeout(() => setCopiedIndex(null), 2000);
+            };
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                }
+            };
+
+            const examples = [
+                'Create a function to sort a list',
+                'Build a binary search algorithm',
+                'Make a function to reverse a string',
+                'Generate a fibonacci sequence'
+            ];
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 gradient-animate">
+                    {/* Header */}
+                    <header className="border-b border-slate-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10 shadow-sm">
+                        <div className="max-w-5xl mx-auto px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                                        <Code />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl font-bold text-slate-900">Text to Code</h1>
+                                        <p className="text-sm text-slate-600">AI-Powered Code Generator</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                    <div className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full font-medium flex items-center gap-1.5">
+                                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                        Live
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="max-w-5xl mx-auto px-6 py-8">
+                        <div className="space-y-6 mb-32">
+                            {messages.map((message, index) => (
+                                <div
+                                    key={index}
+                                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+                                >
+                                    <div
+                                        className={`max-w-3xl ${
+                                            message.type === 'user'
+                                                ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-md shadow-lg'
+                                                : 'bg-white border border-slate-200 rounded-2xl rounded-tl-md shadow-sm hover:shadow-md transition-shadow'
+                                        } px-6 py-4`}
+                                    >
+                                        {message.type === 'user' ? (
+                                            <p className="text-base leading-relaxed">{message.content}</p>
+                                        ) : (
+                                            <div>
+                                                {message.content && (
+                                                    <p className={`text-base leading-relaxed mb-3 ${message.error ? 'text-red-600' : 'text-slate-700'}`}>
+                                                        {message.content}
+                                                    </p>
+                                                )}
+                                                {message.code && (
+                                                    <div className="relative group">
+                                                        <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                                            <button
+                                                                onClick={() => copyToClipboard(message.code, index)}
+                                                                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors shadow-lg"
+                                                                title="Copy code"
+                                                            >
+                                                                {copiedIndex === index ? <Check /> : <Copy />}
+                                                            </button>
+                                                        </div>
+                                                        <pre className="bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto text-sm font-mono shadow-inner">
+                                                            <code>{message.code}</code>
+                                                            {message.isTyping && (
+                                                                <span className="inline-block w-2 h-4 bg-blue-500 ml-1 typing-cursor"></span>
+                                                            )}
+                                                        </pre>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Example Prompts */}
+                        {messages.length === 1 && (
+                            <div className="mb-8 space-y-4 animate-fadeIn">
+                                <p className="text-center text-slate-600 font-medium flex items-center justify-center gap-2">
+                                    <Sparkles />
+                                    Try these examples:
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {examples.map((example, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => setInput(example)}
+                                            className="p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all text-left group transform hover:scale-105"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <Sparkles />
+                                                <span className="text-slate-700 group-hover:text-slate-900">{example}</span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Input Area */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-200 shadow-2xl">
+                        <div className="max-w-5xl mx-auto px-6 py-4">
+                            <form onSubmit={handleSubmit} className="relative">
+                                <div className="flex items-center gap-3 bg-slate-50 rounded-2xl border-2 border-slate-200 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100 transition-all">
+                                    <input
+                                        type="text"
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyPress={handleKeyPress}
+                                        placeholder="Describe the code you want to generate..."
+                                        className="flex-1 bg-transparent px-6 py-4 text-slate-900 placeholder-slate-400 outline-none text-base"
+                                        disabled={isGenerating}
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!input.trim() || isGenerating}
+                                        className="mr-2 p-3 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95 shadow-lg"
+                                    >
+                                        {isGenerating ? (
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <Send />
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                            <p className="text-center text-xs text-slate-500 mt-3">
+                                Powered by T5 Model • Press <kbd className="px-2 py-0.5 bg-slate-200 rounded text-slate-700 font-mono">Enter</kbd> to send
+                            </p>
+                        </div>
+                    </div>
+
+                    <style>{`
+                        @keyframes fadeIn {
+                            from {
+                                opacity: 0;
+                                transform: translateY(10px);
+                            }
+                            to {
+                                opacity: 1;
+                                transform: translateY(0);
+                            }
+                        }
+
+                        .animate-fadeIn {
+                            animation: fadeIn 0.3s ease-out;
+                        }
+
+                        kbd {
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                        }
+                    `}</style>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<TextToCodeUI />, document.getElementById('root'));
+    </script>
+</body>
+</html>
