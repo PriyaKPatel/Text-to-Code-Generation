@@ -107,15 +107,29 @@ jobs:
         echo "Deploying image: $IMAGE_NAME"
         
         ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << EOF
-          # Login to ECR
-          aws ecr get-login-password --region ${AWS_REGION} | \
-            docker login --username AWS --password-stdin ${ECR_REGISTRY}
+          echo "📊 Checking disk space before cleanup..."
+          df -h /
           
+          echo "🧹 Cleaning up Docker to free space..."
           # Stop and remove existing container
           docker stop text-to-code || true
           docker rm text-to-code || true
           
+          # Remove old Docker images and containers
+          docker system prune -a -f
+          
+          # Clean apt cache
+          sudo apt-get clean || true
+          
+          echo "📊 Disk space after cleanup:"
+          df -h /
+          
+          # Login to ECR
+          aws ecr get-login-password --region ${AWS_REGION} | \
+            docker login --username AWS --password-stdin ${ECR_REGISTRY}
+          
           # Pull latest image
+          echo "📥 Pulling new image..."
           docker pull ${IMAGE_NAME}
           
           # Run new container
