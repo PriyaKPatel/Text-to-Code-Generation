@@ -65,8 +65,9 @@ jobs:
     - name: Build, tag, and push image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_NAME: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
       run: |
+        IMAGE_NAME="${ECR_REGISTRY}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+        echo "Building image: $IMAGE_NAME"
         docker build -t $IMAGE_NAME .
         docker push $IMAGE_NAME
         echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
@@ -95,30 +96,37 @@ jobs:
     
     - name: Deploy to EC2
       env:
+        AWS_REGION: ${{ env.AWS_REGION }}
         ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-        IMAGE_NAME: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+        ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+        IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        S3_PREFIX: ${{ secrets.S3_PREFIX }}
       run: |
-        ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+        IMAGE_NAME="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+        echo "Deploying image: $IMAGE_NAME"
+        
+        ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << EOF
           # Login to ECR
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-            docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+          aws ecr get-login-password --region ${AWS_REGION} | \
+            docker login --username AWS --password-stdin ${ECR_REGISTRY}
           
           # Stop and remove existing container
           docker stop text-to-code || true
           docker rm text-to-code || true
           
           # Pull latest image
-          docker pull ${{ env.IMAGE_NAME }}
+          docker pull ${IMAGE_NAME}
           
           # Run new container
           docker run -d \
             --name text-to-code \
             -p 80:8000 \
             --restart unless-stopped \
-            -e AWS_DEFAULT_REGION=${{ env.AWS_REGION }} \
-            -e S3_BUCKET=${{ secrets.S3_BUCKET }} \
-            -e S3_PREFIX=${{ secrets.S3_PREFIX }} \
-            ${{ env.IMAGE_NAME }}
+            -e AWS_DEFAULT_REGION=${AWS_REGION} \
+            -e S3_BUCKET=${S3_BUCKET} \
+            -e S3_PREFIX=${S3_PREFIX} \
+            ${IMAGE_NAME}
           
           # Wait for health check
           sleep 10
