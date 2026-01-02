@@ -16,6 +16,8 @@ ENV/
 .env.local
 aws-config.txt
 acc_id.txt
+SECRETS_VALUES.txt
+.github/SECRETS_VALUES.txt
 # IDE
 .vscode/
 .idea/
@@ -38,7 +40,7 @@ models/*.txt
 models/vocab.json
 models/merges.txt
 !models/.gitkeep
-
+docs/*.md
 # Logs
 *.log
 logs/
